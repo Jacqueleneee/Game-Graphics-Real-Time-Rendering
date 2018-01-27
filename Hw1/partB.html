@@ -1,0 +1,255 @@
+ <!---//KERNEL EFFECTS -->
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>HW1 - Part B</title>
+		<meta charset="utf-8">
+		<style>
+			body {
+			  	margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+<body>
+
+<div id="container"></div>
+
+    <script src="js/three.js"></script>
+
+	<!-- ******************** VERTEX SHADER ******************** --> 
+    <script id="vertexShader" type="x-shader/x-vertex">
+
+	//Three.js gives us these automatically when a perspective camera is bound to the renderer
+	uniform mat4 modelViewMatrix;
+	uniform mat4 projectionMatrix;
+	
+	//Since we are using BufferGeometry, we have defined the attributes that we need manually
+    attribute vec3 position;
+	attribute vec2 texCoords;
+
+	//link variables between the vertex shader and the fragment shader
+	varying vec2 UV;
+
+	void main() {
+
+		//pass our interpolated texCoords to the fragment shader
+	   	UV = texCoords;
+
+        	//of course, we always have to output our vertices in clip coords by multiplying through a projection matrix.
+        	gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); 
+		
+     	 }
+
+    </script>
+
+
+    <!-- ******************** FRAGMENT SHADER ******************** -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+
+	precision mediump float;
+
+	//special data type used to access texture stored on GPU
+	uniform sampler2D t1;
+	
+	//need to know the resolution of texture so that we can grab neighbors of current pixel
+	uniform float rx;
+	uniform float ry;
+
+	uniform float mixVal;
+
+	//this has to have the same name as in the vertex shader. Here, in the fragment shader, we interpolate across the textureCoordinates
+	varying vec2 UV;
+
+      	void main() {
+
+		//see https://en.wikipedia.org/wiki/Sobel_operator
+		
+		vec2 texel = vec2( 1.0 / rx, 1.0 / ry );
+
+		//DIFFERENT EFFECTS HERE BY CHANGING VALUES 
+		const mat3 Gx = mat3( 1/9, 1/9, 1/9, 
+							   1/9, 1/9, 1/9, 
+							   1/9, 1/9, 1/9 ); // x direction kernel - 
+		const mat3 Gy = mat3( 0, -1, 0, 
+							   -1, 5, -1, 
+							   0, -1, 0 ); // y direction kernel		
+
+		
+		// fetch the 3x3 neighborhood of a fragment
+		float tx0y0 = texture2D( t1, UV + texel * vec2( -1, -1 ) ).r; //(face, UV coord, moving image)
+		float tx0y1 = texture2D( t1, UV + texel * vec2( -1,  0 ) ).r;
+		float tx0y2 = texture2D( t1, UV + texel * vec2( -1,  1 ) ).r;
+
+		float tx1y0 = texture2D( t1, UV + texel * vec2(  0, -1 ) ).r;
+		float tx1y1 = texture2D( t1, UV + texel * vec2(  0,  0 ) ).r;
+		float tx1y2 = texture2D( t1, UV + texel * vec2(  0,  1 ) ).r;
+
+		float tx2y0 = texture2D( t1, UV + texel * vec2(  1, -1 ) ).r;
+		float tx2y1 = texture2D( t1, UV + texel * vec2(  1,  0 ) ).r;
+		float tx2y2 = texture2D( t1, UV + texel * vec2(  1,  1 ) ).r;
+
+		float valueGx = Gx[0][0] * tx0y0 + Gx[1][0] * tx1y0 + Gx[2][0] * tx2y0 + 
+				Gx[0][1] * tx0y1 + Gx[1][1] * tx1y1 + Gx[2][1] * tx2y1 + 
+				Gx[0][2] * tx0y2 + Gx[1][2] * tx1y2 + Gx[2][2] * tx2y2;
+
+		float valueGy = Gy[0][0] * tx0y0 + Gy[1][0] * tx1y0 + Gy[2][0] * tx2y0 + 
+				Gy[0][1] * tx0y1 + Gy[1][1] * tx1y1 + Gy[2][1] * tx2y1 + 
+				Gy[0][2] * tx0y2 + Gy[1][2] * tx1y2 + Gy[2][2] * tx2y2;
+
+		float G = sqrt( ( valueGx * valueGx ) + ( valueGy * valueGy ) );
+		
+		vec4 edgePix = vec4(vec3(1.0) - vec3( G ), 1.0);
+		//vec4 edgePix = vec4( vec3( G ), 1.0);
+		vec4 texPix = texture2D(t1, UV);
+
+		//gl_FragColor = vec4( vec3(1.0) - vec3( G ), 1 );
+		gl_FragColor = mix(texPix, edgePix, mixVal); //mix value determined by mouse, will change image
+
+	}
+
+	</script>
+
+
+	<script>
+				
+  	var container;
+
+	var camera, scene, renderer;
+
+      	var vs = document.getElementById( 'vertexShader' ).textContent;
+      	var fs = document.getElementById( 'fragmentShader' ).textContent;
+
+	var mesh;
+	var material;
+
+
+	var texture1 = new THREE.TextureLoader().load( 'city.jpg' );
+
+	var mouseX = 0.0;
+	var mouseY = 0.0;
+
+	init();
+	animate();
+
+
+	function init() {
+
+		container = document.getElementById( 'container' );
+
+		camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 50 );
+		camera.position.z = 2;
+
+		scene = new THREE.Scene();
+
+
+		// buffer geometry
+
+		var geometry = new THREE.BufferGeometry();
+
+		var vertices = new Float32Array( [
+			-1.0, -1.0, 0.0,
+			+1.0, -1.0, 0.0,
+			+1.0, +1.0, 0.0,
+	 
+			-1.0, -1.0, 0.0,
+			+1.0, +1.0, 0.0,
+			-1.0, +1.0, 0.0,
+
+		] );
+
+		var texCoords = new Float32Array( [
+			0.0, 0.0,
+			1.0, 0.0,
+			1.0, 1.0,
+			
+			0.0, 0.0,
+			1.0, 1.0,
+			0.0, 1.0,
+		] );
+
+
+
+		// itemSize = 3 because there are 3 values (components) per vertex
+		geometry.addAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
+		geometry.addAttribute( 'texCoords', new THREE.BufferAttribute( texCoords, 2 ) );
+
+
+		// materials (ie, linking to the shader program)
+		var uniforms = {
+    			t1: { type: "t", value: texture1  },
+			rx: {type: "f", value: 800},
+			ry: {type: "f", value: 800},
+			mixVal: {type: "f", value: 0.5},
+		};
+	
+
+     		material = new THREE.RawShaderMaterial( {
+			uniforms: uniforms,
+            		vertexShader: vs,
+            		fragmentShader: fs,	
+		} );
+
+
+	      	mesh = new THREE.Mesh( geometry, material );
+		mesh.translateX(0.0);
+		mesh.material.side = THREE.DoubleSide; //to render both sides of triangle
+        	scene.add( mesh );
+
+
+		renderer = new THREE.WebGLRenderer();
+		renderer.setClearColor( 0x999999 );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		container.appendChild( renderer.domElement );
+
+
+		//make it so that resizing the browser window also resizes the scene
+        	window.addEventListener( 'resize', onWindowResize, false );
+		document.addEventListener('mousemove', onDocumentMouseMove, false);
+		
+	}
+
+
+
+	function animate() {
+
+		requestAnimationFrame( animate );
+		render();
+
+	}
+
+	function render() {
+
+		var time = performance.now();
+
+		mesh.material.uniforms.mixVal.value = mouseX;
+
+		renderer.render( scene, camera );
+	}
+
+	function onDocumentMouseMove(event) {
+		event.preventDefault();
+		mouseX = (event.clientX / window.innerWidth) ;
+		mouseY = -(event.clientY / window.innerHeight) ;
+	}
+
+
+	function onWindowResize( event ) {
+
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+
+		renderer.setSize( window.innerWidth, window.innerHeight );
+
+	}
+
+
+		</script>
+
+	</body>
+</html>
+
+</html>

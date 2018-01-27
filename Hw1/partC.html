@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>HW1- Part C</title>
+		<meta charset="utf-8">
+		<style>
+			body {
+			  	margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+	<div id="container"></div>
+
+	<script src="js/three.js"></script>
+  
+	<!-- ******************** VERTEX SHADER ******************** -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+	uniform mat4 modelViewMatrix;
+      	uniform mat4 projectionMatrix;
+
+	attribute vec3 position;
+	
+    	void main() {
+ 		gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+	}
+
+    </script>
+
+    <!-- ******************** FRAGMENT SHADER ******************** -->
+
+    <script id="fragmentShader" type="x-shader/x-fragment"> /*RESPONSIBLE FOR RULES OF GAME */
+
+		precision mediump float;
+
+		uniform vec2 textureSize; //The width and height of our screen
+		uniform sampler2D bufferTexture; //Our input texture
+		
+		void main() {
+
+			vec2 pt = gl_FragCoord.xy; //for simple scenes, can also use gl_FragCoord instead of uv info, divide by texture size to get a value between 0.0 and 1.0
+			vec4 C = texture2D( bufferTexture, vec2( pt.x/textureSize.x, pt.y/textureSize.y ) );
+
+			float cx = pt.x/textureSize.x;
+
+			//Get coordinates
+			float left = cx - 1.0/textureSize.x;
+			if (left < 0.0) { left = 1.0; }
+			float right = cx + 1.0/textureSize.x;
+			if (left > 1.0) { left = 0.0; }
+
+
+			float cy = pt.y/textureSize.y;
+			
+			float down = cy - 1.0/textureSize.y;
+			if (down < 0.0) { down = 1.0; }
+			float up = cy + 1.0/textureSize.y;
+			if (up > 1.0) { up = 0.0; }
+
+
+			vec4 arr[8];
+
+
+			//LOOK AT ITS NEIGHBORS
+			arr[0] = texture2D( bufferTexture, vec2( cx   , up ));   //N
+			arr[1] = texture2D( bufferTexture, vec2( right, up ));   //NE
+			arr[2] = texture2D( bufferTexture, vec2( right, cy ));   //E
+			arr[3] = texture2D( bufferTexture, vec2( right, down )); //SE
+			arr[4] = texture2D( bufferTexture, vec2( cx   , down )); //S
+			arr[5] = texture2D( bufferTexture, vec2( left , down )); //SW
+			arr[6] = texture2D( bufferTexture, vec2( left , cy ));   //W
+			arr[7] = texture2D( bufferTexture, vec2( left , up ));   //NW
+
+
+			//************* RULES IMPLEMENTED BELOW HERE ************
+			//Counting amout of alive neighbors
+			int cnt = 0;
+			for(int i=0;i<8;i++){ //have 8 neighbors
+				if (arr[i].r > 0.5) { //if red channel is greater, it counts as alive
+					cnt++;
+				}
+			}
+
+			//NOTE: (1,1,1) - Black... (r,g,b)
+				        
+			if (C.r >= 0.5) { //cell is alive (the center - myself)
+				if (cnt == 5 || cnt == 6 ) {
+					//Any live cell with two or three live neighbours lives on to the next generation.
+					gl_FragColor = vec4(.804,.361,.361,1.0); // (1,0,0,1) - make sure not to change red channel
+				} else  if (cnt == 4 ) {
+					gl_FragColor = vec4(.565,.906,0.906,1.0);
+				} else {
+					//Any live cell with fewer than two live neighbours dies, as if caused by underpopulation.
+					//Any live cell with more than three live neighbours dies, as if by overpopulation.
+
+					gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+				}
+			} else { //cell is dead
+				if (cnt == 4) {
+					//Any dead cell with exactly three live neighbours becomes a live cell, as if by reproduction.
+
+					gl_FragColor = vec4(.804,.361,.361,1.0); // (1, 0 , 0 ,1)
+				} else if (cnt == 5 ) {
+					gl_FragColor = vec4(.565,.906,0.906,1.0);
+				} else {
+					gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+
+				}
+			}
+
+		 }
+	</script>	
+
+	<!-- ******************** CAMERA, SCENE, RENDERER ******************** -->
+	<script>
+		
+
+var scene;
+var camera;
+var renderer;
+
+
+var resX = 300;
+var resY = 300;
+
+
+var bufferScene;
+var bufferMaterial;
+var bufferObject;
+var FBO_A, FBO_B;
+var plane;
+var fullScreenQuad;
+
+
+
+
+scene_setup(); //initialize the Three.js scene
+
+function scene_setup(){
+	//This is the basic scene setup
+	scene = new THREE.Scene();
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+
+	//orthographic camera can be used for 2D
+	camera = new THREE.OrthographicCamera( width / -2, width / 2, height / 2, height / -2, 0.1, 1000 );
+	camera.position.z = 0.2;
+
+	renderer = new THREE.WebGLRenderer();
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	document.body.appendChild( renderer.domElement );
+}
+
+
+FBO_setup(); //creates textures and new scene
+
+function FBO_setup(){
+	//Create off-screen buffer scene
+	bufferScene = new THREE.Scene();
+	
+	//Create 2 buffer textures
+	//FBO_A = new THREE.WebGLRenderTarget( resX, resY );
+	//FBO_B = new THREE.WebGLRenderTarget( resX, resY ); 
+	FBO_A = new THREE.WebGLRenderTarget( resX, resY, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+	FBO_B = new THREE.WebGLRenderTarget( resX, resY, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+
+
+	
+	//Begin by passing an initial "seed" texture to shader, containing randomly placed cells
+	var dataTexture = createDataTexture(); //create C texture
+
+	bufferMaterial = new THREE.RawShaderMaterial( {
+		uniforms: {
+			bufferTexture: { type: "t", value: dataTexture },
+			textureSize : {type: "v2", value: new THREE.Vector2( resX, resY )}  //shader doesn't have access to these global variables, so pass in the resolution
+		},
+		vertexShader: document.getElementById( 'vertexShader' ).innerHTML,
+		fragmentShader: document.getElementById( 'fragmentShader' ).innerHTML
+	} );
+
+	//we can use a Three.js Plane Geometry along with the orthographic camera to create a "full screen quad"
+	plane = new THREE.PlaneBufferGeometry( window.innerWidth, window.innerHeight )
+
+	bufferObject = new THREE.Mesh( plane, bufferMaterial ); //bufferMaterial stays in the background
+	bufferScene.add(bufferObject);
+
+
+	//Draw textureB to screen 
+	fullScreenQuad = new THREE.Mesh( plane, new THREE.MeshBasicMaterial() );  //rendered using plane geometry 
+	scene.add(fullScreenQuad);
+}
+
+
+
+render();
+
+function render() {
+
+	requestAnimationFrame( render );
+
+	
+	//Draw to the active offscreen buffer (whatever is stored in FBO_B), that is the output of this rendering pass will be stored in the texture associated with FBO_B
+	renderer.render(bufferScene, camera, FBO_B);
+	
+	//grab that texture and map it to the full screen quad
+	fullScreenQuad.material.map = FBO_B.texture;
+
+	//Then draw the full sceen quad to the on screen buffer, ie, the display
+	renderer.render( scene, camera );
+
+
+	//Now prepare for the next cycle by swapping FBO_A and FBO_B, so that the previous frame's *output* becomes the next frame's *input*
+	var t = FBO_A;
+	FBO_A = FBO_B;
+	FBO_B = t;
+	bufferMaterial.uniforms.bufferTexture.value = FBO_A.texture;
+}
+
+
+
+
+function createDataTexture() {
+
+	// create a buffer with color data
+
+	var size = resX * resY;
+	var data = new Uint8Array( 4 * size );
+
+
+	for ( var i = 0; i < size; i++ ) {
+
+		var stride = i * 4;
+
+		//CHANGE THE STATES AND CODE HERE
+		//float r = Math.random();
+		// if r > 0 && r < .25 ...do the following
+		if (Math.random() < 0.5) {
+			data[ stride ] = 255;
+			data[ stride + 1 ] = 255;
+			data[ stride + 2 ] = 255;
+			data[ stride + 3 ] = 255;
+			data[ stride + 4 ] = 255;
+		}
+		else {
+			data[ stride ] = 0;
+			data[ stride + 1 ] = 0;
+			data[ stride + 2 ] = 0;
+			data[ stride + 3 ] = 0;
+			data[ stride + 4 ] = 0;
+		}
+	}
+
+
+	// used the buffer to create a DataTexture
+
+	console.log(data);
+	var texture = new THREE.DataTexture( data, resX, resY, THREE.RGBAFormat );
+	
+	texture.needsUpdate = true; // just a weird thing that Three.js wants you to do after you set the data for the texture
+
+	return texture;
+
+}
+	</script>	
+
+
+
+
+
+	</body>

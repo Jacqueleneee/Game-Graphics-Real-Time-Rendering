@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+	<head>
+		<title> HW 1 - Part A</title>
+		<style>
+		body { margin: 0px; }
+		canvas { width: 100%; height: 100% }	
+		</style>
+	</head>
+	<body>
+		<script src="js/three.js"></script>
+
+		<!-- ******************** VERTEX SHADER ******************** -->
+		<script type = "x-shader/x-vertex" id="vertexShader">
+			//Three.js gives us these automatically when a perspective camera is bound to the renderer
+			uniform mat4 modelMatrix;
+			uniform mat4 viewMatrix;
+			uniform mat4 projectionMatrix;
+
+			//Three.js geometry creates these for us (and also texture coords, which we aren't using here)
+			attribute vec3 position;
+		    attribute vec3 normal;
+
+		    //We are explicitly passing these in
+	      	uniform vec3 light1_pos;
+	      	uniform vec3 light2_pos;
+	      	uniform vec3 light3_pos;
+			varying vec3 N, L1, L2, L3, V;
+
+			void main() {
+				//get the vertex position in CAMERA coords
+				vec4 position = viewMatrix * modelMatrix * vec4(position, 1.0);
+
+				//use xyz vals to calculate vectors between vertex, light, and camera
+				vec3 P = position.xyz;
+
+				//get the normalized vertex normal in CAMERA coords
+				N = vec3(normalize(viewMatrix * modelMatrix * vec4(normal.xyz, 0.0)  ).xyz) ;
+
+				//the lights positions are defined in WORLD coordinates, we want to put them in CAMERA coordinates too
+	        	vec4 L1_cam = viewMatrix * vec4(light1_pos, 1.0);
+	        	vec4 L2_cam = viewMatrix * vec4(light2_pos, 1.0);
+	        	vec4 L3_cam = viewMatrix * vec4(light3_pos, 1.0);
+
+	        	//get the normalized vectors from each light position to the vertex positions
+	        	L1 = vec3(normalize(L1_cam - position).xyz);
+	        	L2 = vec3(normalize(L2_cam - position).xyz);
+	        	L3 = vec3(normalize(L3_cam - position).xyz);
+
+	        	//reverse direction of position vector to get view vector from vertex to camera
+    			V = normalize(-P);
+
+				//of course, we always have to output our vertices in clip coords by multiplying through a projection matrix.
+    			gl_Position = projectionMatrix * position; 
+			}
+		</script>
+
+		<!-- ******************** FRAGMENT SHADER ******************** -->
+		<script type = "x-shader/x-fragment" id="fragmentShader">
+
+			precision mediump float;
+	
+      		varying vec3 V, N, L1, L2, L3;
+      		float spec_intensity = 75.0; //higher value indicates more rapid falloff
+
+      		uniform vec3 ambient; //general ambient light in the scene applied to all objects
+
+	      	uniform vec3 light1_diffuse;
+	      	uniform vec3 light2_diffuse;
+			uniform vec3 light3_diffuse;
+
+	      	uniform vec3 light1_specular;
+	      	uniform vec3 light2_specular;
+	      	uniform vec3 light3_specular;
+
+			void main() {
+        		vec4 outColor1 = vec4(0.0);
+        		vec4 outColor2 = vec4(0.0);
+        		vec4 outColor3 = vec4(0.0);
+
+        		// ---------- LIGHT 1 CHARACTERISTICS --------
+        		//diffuse light depends on the angle between the light and the vertex normal
+        		float diff1 = max(0.0, dot(N, L1)); //just to make sure not negative
+        		vec3 color1 = diff1 * light1_diffuse;
+        
+        		//specular highlights depend upon the position/orientation of the camera and the direction of the light reflecting off of this geometry
+        		vec3 R1 = normalize(reflect(-L1,N)); //get light vector reflected across the plane defined by the normal of this geometry
+        		float spec1 = pow( max(dot(R1, V), 0.0), spec_intensity); //raising the value to a particular intensity value shrinks the size of the specular highlight so that only a reflection vector (R1) that is very close to the view vector (V) will be applied to this fragment.
+        
+        		color1 += spec1 * light1_specular;
+        		if (spec1 > 1.0) {
+          			outColor1 = vec4(light1_specular,1.0);
+        		} else {
+          			outColor1 = clamp(vec4(color1,1.0), 0.0,1.0);
+        		}
+        
+        		// ---------- LIGHT 2 CHARACTERISTICS --------
+	        	//diffuse
+	        	float diff2 = max(0.0, dot(N, L2));
+	        	vec3 color2 = diff2 * light2_diffuse;
+        
+        
+	        	//specular
+	        	vec3 R2 = normalize(reflect(-L2,N));
+	        
+	        	float spec2 = pow( max(dot(R2, V), 0.0), spec_intensity);
+	        	color2 += spec2 * light2_specular;
+
+
+	        	if (spec2 > 1.0) {
+	          		outColor2 = vec4(light2_specular,1.0);
+	        	} else {
+	          		outColor2 = clamp(vec4(color2,1.0), 0.0,1.0);
+	        	}
+
+	        	// ---------- LIGHT 3 CHARACTERISTICS --------
+	        	//diffuse
+	        	float diff3 = max(0.0, dot(N, L3));
+	        	vec3 color3 = diff3 * light3_diffuse;
+        
+        
+	        	//specular
+	        	vec3 R3 = normalize(reflect(-L3,N));
+	        
+	        	float spec3 = pow( max(dot(R3, V), 0.0), spec_intensity);
+	        	color3 += spec3 * light3_specular;
+	        	
+	        	
+	        	if (spec3 > 1.0) {
+	          		outColor3 = vec4(light3_specular,1.0);
+	        	} else {
+	          		outColor3 = clamp(vec4(color3,1.0), 0.0,1.0);
+	        	}
+	        
+	        	gl_FragColor = clamp(vec4(ambient, 1.0) + outColor1 + outColor2 + outColor3, 0.0, 1.0); //add the two lights together, make sure final value is between 0.0 and 1.0				
+				}
+		</script>
+
+
+
+
+
+		<script>
+
+	
+
+		//********************** INIT ********************
+		var container;
+		var camera, scene, renderer;
+
+		camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 50 );
+		camera.position.z = 5; 
+
+		scene = new THREE.Scene();
+
+		renderer = new THREE.WebGLRenderer();
+		renderer.setClearColor (0x999999);
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		document.body.appendChild( renderer.domElement);
+
+		//********************** LIGHT PROPERTIES ********************
+		var ambient = new THREE.Vector3(0.1, 0.1, 0.1);
+
+		//----- LIGHT1 (above) -----
+		var light1_pos = new THREE.Vector3(0.0, 10.0, 0.0);
+		var light1_diffuse = new THREE.Vector3(1.0,.899,.419); //yellow light
+		var light1_specular = new THREE.Vector3(1.0,1.0,1.0); //white shine
+		//----- LIGHT2 (left) -----
+		var light2_pos = new THREE.Vector3(-10.0, 0.0, 0.0);
+		var light2_diffuse = new THREE.Vector3(1.0,0.624,.624); //pink light
+		var light2_specular = new THREE.Vector3(1.0,1.0,1.0); //white shine
+		//----- LIGHT3 (right) -----
+		var light3_pos = new THREE.Vector3(10.0, 0.0, 0.0);
+		var light3_diffuse = new THREE.Vector3(.565,.906,0.906); //blue light
+		var light3_specular = new THREE.Vector3(1.0,1.0,1.0); //white shine
+
+		//********************** CREATE GEOMETRY SHAPES ********************** 
+		var geometry1, geometry2, geometry3;
+		var material;
+
+		// --------- MATERIAL (Call light properties defined)---------
+		var uniforms = {
+			ambient: { type: "v3", value: ambient},
+			//light1
+			light1_pos: { type: "v3", value: light1_pos },
+			light1_diffuse: { type: "v3", value: light1_diffuse},
+			light1_specular: { type: "v3", value: light1_specular},
+			//light2
+			light2_pos: { type: "v3", value: light2_pos },
+			light2_diffuse: { type: "v3", value: light2_diffuse},
+			light2_specular: { type: "v3", value: light2_specular},
+			//light3
+			light3_pos: { type: "v3", value: light3_pos },
+			light3_diffuse: { type: "v3", value: light3_diffuse},
+			light3_specular: { type: "v3", value: light3_specular},
+		};
+
+		var moveLight = {//light3
+			light3_pos: { type: "v3", value: light3_pos },
+			light3_diffuse: { type: "v3", value: light3_diffuse},
+			light3_specular: { type: "v3", value: light3_specular},};
+
+		material = new THREE.RawShaderMaterial ({
+			uniforms: uniforms,
+			vertexShader: document.getElementById('vertexShader').textContent,
+			fragmentShader: document.getElementById('fragmentShader').textContent,
+		});
+
+		//----- GEOMETRY1 -----
+		var loader1 = new THREE.JSONLoader();
+		loader1.load("models/mug.json", handle_load1);
+		geometry1 = new THREE.Mesh();
+		var mugMap = new THREE.TextureLoader().load('textures/coffee-text.jpg');
+		//mugMap.mapping = THREE.SphericalReflectionMapping;
+		//mugMap.wrapS = THREE.RepeatWrapping;
+		//mugMap.wrapT = THREE.RepeatWrapping;
+	    //geometry1 = new THREE.Mesh( loader1, new THREE.MeshBasicMaterial( { envMap: mugMap, overdraw: 0.5 } ) );
+
+		function handle_load1 (geometry, materials) {
+			geometry.computeVertexNormals();
+			geometry1.geometry = geometry;
+			geometry1.material = material;
+			scene.add(geometry1);
+		}
+		geometry1.translateX(-2.5);
+		geometry1.scale.set(.2,.2,.2);
+
+		//----- GEOMETRY2 -----
+		var loader2 = new THREE.JSONLoader();
+		loader2.load("models/apple.json", handle_load2);
+		geometry2 = new THREE.Mesh();
+
+		function handle_load2 (geometry, materials) {
+			geometry2.geometry = geometry;
+			geometry2.material = material;
+			scene.add(geometry2);
+		}
+		geometry2.translateX(0.0);
+		geometry2.scale.set(.2,.2,.2);
+
+		//----- GEOMETRY3 -----
+		var loader3 = new THREE.JSONLoader();
+		loader3.load("models/monkey.json", handle_load3);
+		geometry3 = new THREE.Mesh();
+
+		function handle_load3 (geometry, materials) {
+			geometry3.geometry = geometry;
+			geometry3.material = material;
+			scene.add(geometry3);
+		}
+		geometry3.translateX(2.5);
+		geometry3.scale.set(.6,.6,.6);
+
+
+		//********************** DRAW TO SCREEN ********************
+		window.addEventListener ('resize', onWindowResize, false);
+
+		var animate = function () {
+			requestAnimationFrame( animate ); //requests frame to redraw each second (passing in func)
+
+			render(); 
+			};
+
+		function render () {
+				var time = performance.now();
+  		  geometry1.rotation.x = time * 0.00005;
+          geometry1.rotation.y = time * 0.0005;
+
+		  geometry2.rotation.x = time * 0.00005;
+		  geometry2.rotation.y = time * 0.0005;
+		  geometry2.rotation.z = time * .00005;
+
+		  geometry3.rotation.y = time * 0.0009;
+
+		  moveLight.rotation= time * 0.0005;
+
+		//if I want to update the lights, I acutally have to update the material used by each object in the scene. 
+		//material.uniforms.light1_diffuse.value = new THREE.Vector3(0.0,1.0,0.0);
+
+		renderer.render( scene, camera ); //render scene with this camera
+		}	
+
+			animate(); //tells webGL renderer to run as fast as possible
+
+
+
+		function onWindowResize (event) {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+		}
+
+
+
+
+
+		</script>
+
+
+	</body>
+</html>
