@@ -1,0 +1,110 @@
+<html>
+    <head>
+        <title>CMPM163 Review</title>
+        <style>
+            body { margin: 0; }
+        </style>
+    </head>
+
+    <body>
+        <script src="js/three.js"></script>
+        <!--//If add shaders in files..
+        //Load external shaders 
+        <script src="shaders/basic-color-vertex-shader.js"></script>-->
+
+        <!--VERTEX SHADER (GLSL code)-->
+        <script id="basicColorVertexShader" type="x-shader/x-vertex"> 
+        //Tell engine to compile as GLSL, not JS using script tags
+        //GLSL code here
+        uniform float time;  
+        varying vec3 fPosition;  
+        //attribute vec3 position; //must user RawShader material for this. ShaderMaterial already gives this    
+        void main() {
+        	//attribute vec3 position; //passed to us automatically when creating shader material so already defined for us.
+        	// • Raw shader material doesnt give this ot us - RawShaderMaterial - must be defined
+
+        	fPosition = position;  
+        	//project 3d coordinates and map it to screen
+        	gl_Position = projectionMatrix * modelViewMatrix *  vec4(position, 1.0);//vertex you are working on, maps it to the screen
+        }
+        </script>
+
+
+        <script id="basicColorFragShader" type="x-shader/x-fragment">
+        //GLSL code
+        uniform float time;
+        varying vec3 fPosition; //has access from vertex shaders
+        void main() {
+        	//assign color to pixel
+        	gl_FragColor = vec4(fPosition.x,fPosition.y,fPosition.z,1.0); //actual position relative to center position
+        	 //gl_FragColor = vec4(abs(sin(time)),0.0,0.0,1.0); //RGB,alpha //combine and send to GPU
+        	//sin goes to one to -one, without abs - it will stay longer in black after values goes past 0
+        }	
+        </script>
+
+
+
+        <script>
+            // 0. Create a renderer
+            var renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // 1. Create a Scene
+            var scene = new THREE.Scene();
+
+            // 1.1 Create a camera
+            var camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+            // 2. Create a cube
+            var cube = new THREE.BoxGeometry(1, 1, 1);
+
+            //**********GET SHADERS**********
+            var vShader = document.getElementById("basicColorVertexShader").textContent;
+            // var vShader = 'void main() {
+            // 	gl_Position = projectionMatrix * modelViewMatrix *  vec4(position, 1.0);
+            // }';
+            //console.log(vShader);//prints string to console
+            var fShader = document.getElementById("basicColorFragShader").textContent;
+
+            //container - each element is itself an object
+            var shaderInput = {
+            	time: {type: "f", value: 1.0} //provide CPU data to compile and map variables correctly
+            }
+
+            var material = new THREE.ShaderMaterial({
+            	//objects and strings(actual code)
+            	//sends this to GPU to compile the code - passing empty will give errors
+            	// Data types: varying, attribute, uniform
+            	//varying - pass data from vertex to frag shader (sent output as input to frag shader)
+            	//attribute - only avail to vertex shader (related to vertices)
+            	uniforms: shaderInput, //avail for both vertex/frag shaders and has SAME VALUE PER FRAME (each frame you can change value) - input to both shaders
+            	vertexShader: vShader,
+            	fragmentShader: fShader
+            });
+
+            var mesh = new THREE.Mesh(cube, material)
+            mesh.position.z = -5;
+
+            // 3. Add cube to the scene
+            scene.add(mesh);
+
+            var update = function() {
+            	//see attributes
+            	 //console.log(mesh);
+            	mesh.material.uniforms.time.value += 0.05; //increase time every frame //60 frames per second so summation got to one very quick
+
+            	mesh.rotation.z +=.01;
+                mesh.rotation.x += 0.01
+                mesh.position.y += 0.001
+
+                // 3. Render the scene on the screen
+                renderer.render(scene, camera);
+                requestAnimationFrame(update);
+            }
+
+
+            update();
+        </script>
+    </body>
+</html>
