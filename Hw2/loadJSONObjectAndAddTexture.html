@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - blender -json</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background:#777;
+				padding:0;
+				margin:0;
+				overflow:hidden;
+			}
+
+			#info {
+				position: absolute;
+				top: 0px;
+				width: 100%;
+				color: #ffffff;
+			}
+
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+
+		<script src="js/three.js"></script>
+
+  <script id="vertexShader" type="x-shader/x-vertex">
+
+
+	uniform mat4 modelMatrix;
+	uniform mat4 viewMatrix;
+      	uniform mat4 projectionMatrix;
+
+     	attribute vec3 position; 
+     	attribute vec2 uv;
+
+	varying vec2 vUV;
+
+	void main() {
+
+        	vec4 position = viewMatrix * modelMatrix * vec4(position, 1.0);
+	   	vUV = uv; 
+        	gl_Position = projectionMatrix * position; 
+     	 }
+
+    </script>
+
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+
+	precision mediump float;
+	uniform sampler2D t1;
+	varying vec2 vUV;
+
+      	void main() {
+		vec4 c1 = texture2D(t1, vUV);
+		//vec4 c2 = vec4(0.0,1.0,0.0,1.0);
+        	gl_FragColor = c1; //, c2, 0.5);
+	}
+
+	</script>
+
+
+	<script>
+
+		var vs = document.getElementById( 'vertexShader' ).textContent;
+      		var fs = document.getElementById( 'fragmentShader' ).textContent;
+
+		var container;
+		var camera, scene, renderer;
+
+		var mesh;
+
+		var texture1;
+
+		init();
+		animate();
+
+
+		function processBlenderObject (geometry, materials) {
+
+				//var useGeometry = new THREE.BufferGeometry().fromGeometry( geometry );
+				var useGeometry = geometry;
+
+				var uniforms = {
+					t1: { type: "t", value: texture1  },
+				};
+
+				var material = new THREE.RawShaderMaterial( {
+					uniforms: uniforms,
+					vertexShader: vs,
+					fragmentShader: fs,	
+				} );
+
+
+				mesh = new THREE.Mesh( useGeometry, material );
+
+
+				//positioning and scaling blender obj so that it's in the center of the screen
+				mesh.position.set( 0, -1.5, 0 );
+				var s = 0.0125;
+				mesh.scale.set( s, s, s );
+				mesh.rotation.y = -Math.PI / 4;
+
+				scene.add( mesh );
+
+
+		}
+
+		function init() {
+
+			container = document.getElementById( 'container' );
+
+			camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 1, 2000 );
+			camera.position.set( 0, 0, 5 );
+
+			scene = new THREE.Scene();
+			scene.fog = new THREE.FogExp2( 0x000000, 0.035 );
+
+
+			//texture1 = new THREE.TextureLoader().load( 'myImage.jpg' );
+			texture1 = createDataTexture();
+
+			var loader = new THREE.JSONLoader();
+			loader.load( 'horse.js', processBlenderObject );
+	
+			renderer = new THREE.WebGLRenderer();
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			container.appendChild( renderer.domElement );
+
+			window.addEventListener( 'resize', onWindowResize, false );
+		}
+
+		function onWindowResize( event ) {
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+		}
+
+
+		function animate() {
+
+			requestAnimationFrame( animate );
+			render();
+		}
+
+		function render() {
+			camera.lookAt( scene.position );
+			renderer.render( scene, camera );
+		}
+
+		function createDataTexture() {
+
+			// create a buffer with color data
+
+			var resX = 25;
+			var resY = 25;
+
+			var size = resX * resY;
+			var data = new Uint8Array( 4 * size );
+
+			for ( var i = 0; i < size; i++ ) {
+				var stride = i * 4;
+
+				data[ stride ] = Math.random() * 255;
+				data[ stride + 1 ] = Math.random() * 255;;
+				data[ stride + 2 ] = Math.random() * 255;;
+				data[ stride + 3 ] = 255;
+			}
+
+
+			var texture = new THREE.DataTexture( data, resX, resY, THREE.RGBAFormat );
+			texture.needsUpdate = true; // just a weird thing that Three.js wants you to do after you set the data for the texture
+
+			return texture;
+		}
+
+
+	</script>
+	</body>
+</html>

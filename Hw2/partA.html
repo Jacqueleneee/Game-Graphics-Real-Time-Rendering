@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>HW2 - Part A</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background:#777;
+				padding:0;
+				margin:0;
+				overflow:hidden;
+			}
+
+			#info {
+				position: absolute;
+				top: 0px;
+				width: 100%;
+				color: #ffffff;
+			}
+
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+
+		<!-- Load external Libraries -->
+		<script src="js/three.js"></script>
+		<script src="./js/dat.gui.min.js"></script>		
+		<script src="js/OBJLoader.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/objects/Water.js"></script>
+		
+
+		<!--Load External Shaders -->
+		<script src="shaders/skyboxVS.js"></script>
+		<script src="shaders/skyboxFS.js"></script>
+		<script src="shaders/environmentMapVS.js"></script>
+		<script src="shaders/environmentMapFS.js"></script>
+		<script src="shaders/texVS.js"></script>
+		<script src="shaders/texFS.js"></script>
+		<script src="shaders/heightMapVS.js"></script>
+		<script src="shaders/heightMapFS.js"></script>
+
+<!--********************************* MAIN ******************************-->
+	<script>
+
+		var container;
+		var camera, scene, renderer;
+
+		//SkyBox
+		var skyMesh, box, jaguar;
+		var texture1;
+		//Water
+		var water, light;
+		var parameters = {
+			oceanSide: 3500,
+			size: 1.0,
+			distortionScale: 3.7,
+			alpha: 1.0
+		};
+		//HeightMap Terrain
+		var terrain_texture1 = new THREE.TextureLoader().load( 'textures/heightMap.jpg' );
+		var terrain_texture2 = new THREE.TextureLoader().load( 'textures/stone.jpeg' );
+		var terrain_texture3 = new THREE.TextureLoader().load( 'textures/beachSand.jpg' );
+		var terrain_texture4 = new THREE.TextureLoader().load( 'textures/rock.jpg' );
+
+
+
+		
+		//Gui Controls
+	    var datGUI = new dat.GUI ({width:350});
+		var boxControls;
+
+		
+
+		init();
+		animate();
+
+
+		function init() {
+
+			container = document.getElementById( 'container' );
+
+			camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 1, 2000 );
+			camera.position.set( 0, 5, 5 );
+
+			//adds a default mouse listener to control the camera rotation and zoom
+			var controls = new THREE.OrbitControls( camera );
+			camera.position.z = 40;
+			controls.update();
+
+			scene = new THREE.Scene();
+
+			// **************** TERRAIN HEIGHT MAP ***************
+			// geometry
+			var terrain = new THREE.PlaneGeometry( 500, 500, 500, 500 );
+
+			// material
+
+			var terrain_uniforms =  {
+				displaceAmt: { type: "f", value: 0.0 },
+				tPic: { type: "t", value: terrain_texture1  },
+				tGrass: { type: "t", value: terrain_texture2  },
+				tSnow: { type: "t", value: terrain_texture3  },
+				tHill: { type: "t", value: terrain_texture4  },
+			};
+
+
+			var terrain_material = new THREE.RawShaderMaterial( {
+
+				uniforms: terrain_uniforms,
+				vertexShader: heightMapVS,
+				fragmentShader: heightMapFS,
+
+			} );
+
+
+			var terrain_mesh = new THREE.Mesh( terrain, terrain_material );
+			terrain_mesh.material.side = THREE.DoubleSide;
+			terrain_mesh.rotateX(-Math.PI/2);
+			terrain_mesh.position.y = -15.0;
+
+			scene.add( terrain_mesh );
+
+
+			// **************** WATER ***************
+			setWater();
+
+
+			// **************** SKY BOX ***************
+			var material = new THREE.MeshPhongMaterial( {
+					vertexColors: THREE.FaceColors,
+					shininess: 10,
+					envMap: cubeMap,
+					side: THREE.DoubleSide
+			} );
+
+			var cubeMap = new THREE.CubeTextureLoader()
+				.setPath("./Lycksele2/")
+				.load( [
+					'posx.jpg',
+					'negx.jpg',
+					'posy.jpg',
+					'negy.jpg',
+					'posz.jpg',
+					'negz.jpg'
+				] );
+			
+			var uniforms = { "tCube": { type: "t", value: cubeMap } };
+			
+			var material = new THREE.RawShaderMaterial( {
+					uniforms: uniforms,
+					vertexShader: skyboxVS,
+					fragmentShader: skyboxFS
+				} );
+
+
+			material.depthWrite = false;
+      			material.side = THREE.BackSide;
+			
+
+			var geometry = new THREE.BoxGeometry( 2000, 2000, 2000 );
+
+			skyMesh = new THREE.Mesh( geometry, material );
+
+
+			scene.add( skyMesh );
+
+			
+		
+	var uniforms2 = {
+        	tCube: { type: "t", value: cubeMap },
+	};
+
+
+	var material2 = new THREE.RawShaderMaterial( {
+					uniforms: uniforms2,
+					vertexShader: environmentMapVS,
+					fragmentShader: environmentMapFS
+	} );
+	
+
+	/*
+	var objTex = new THREE.TextureLoader().load( 'jaguar.png' );
+	var uniforms2 = {
+    			tex: { type: "t", value: objTex  },
+	};
+	
+
+     	material2 = new THREE.RawShaderMaterial( {
+			uniforms: uniforms2,
+            		vertexShader: texVS,
+            		fragmentShader: texFS,	
+	} );
+	*/
+
+			
+
+	var loader = new THREE.OBJLoader(  );
+				
+	// //loader.load( 'jaguar.obj', function ( object ) {
+		
+	// 	object.traverse( function ( child ) {
+	// 		if ( child instanceof THREE.Mesh ) {
+	// 			child.material = material2;
+	// 		}
+	// 	} );
+		
+	// 	var s = 0.2;
+	// 	object.scale.set( s, s, s );
+	// 	object.position.x += 1.0;
+	// 	object.position.y -= 0.5;
+
+	// 	//jaguar = object;
+	// 	//scene.add( jaguar );
+	// } );
+
+
+	var gBox = new THREE.BoxGeometry( 1, 1, 1 );
+	box = new THREE.Mesh(gBox, material2);
+	box.position.x -= 1.0;
+	scene.add (box);
+
+	// ********SET UP GUI CONTROLS******
+	boxControls = {
+		boxRotationX: .001,
+		boxRotationY: .002
+	}
+
+	datGUI.add(boxControls, 'boxRotationX', 0 ,1);
+	//datGUI.add(boxControls, 'boxRotationY', 0 ,1);
+	datGUI.add(parameters, 'alpha', 0, 1);
+	datGUI.add(parameters, 'size', .1, 10, 0.1);
+	//datGUI.add(scene.children[0]);
+
+
+
+	renderer = new THREE.WebGLRenderer();
+	renderer.setPixelRatio( window.devicePixelRatio );
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	container.appendChild( renderer.domElement );
+
+	window.addEventListener( 'resize', onWindowResize, false );
+	document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+
+}
+
+
+function setWater() {
+
+	var waterGeometry = new THREE.PlaneBufferGeometry( parameters.oceanSide * 5, parameters.oceanSide * 5 );
+
+	water = new THREE.Water(
+		waterGeometry,
+		{
+			textureWidth: 512,
+			textureHeight: 512,
+			waterNormals: new THREE.TextureLoader().load( 'textures/waternormals.jpg', function ( texture ) {
+				texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+			}),
+			alpha: parameters.alpha,
+			//sunDirection: light.position.clone().normalize(),
+			sunColor: 0xffffff,
+			waterColor: 0x001e0f,
+			distortionScale: parameters.distortionScale,
+			fog: scene.fog !== undefined
+		}
+	);
+
+	water.rotation.x = - Math.PI / 2;
+	water.receiveShadow = true;
+
+	scene.add( water );
+
+}
+
+
+function onWindowResize( event ) {
+
+	renderer.setSize( window.innerWidth, window.innerHeight );
+
+	camera.aspect = window.innerWidth / window.innerHeight;
+	camera.updateProjectionMatrix();
+}
+
+
+function animate() {
+
+	requestAnimationFrame( animate );
+	render();
+}
+
+
+function render() {
+
+
+	var time = performance.now() * .001;
+	var terrain_time = performance.now();
+
+
+	//OBJECTS
+	box.rotation.y += boxControls.boxRotationY;
+	box.rotation.x -= boxControls.boxRotationX;
+	//jaguar.rotation.y -= 0.001;
+	//jaguar.rotation.x += 0.002;
+
+	//TERRAIN
+	var object0 = scene.children[ 0 ];
+				//object0.material.uniforms.displaceAmt.value = 0.5 * (1.0 + Math.sin(time * 0.001)); 
+			
+        			object0.material.uniforms.displaceAmt.value = 1.0;
+
+
+	//WATER
+	water.material.uniforms.time.value += 1.0 / 60.0;
+	water.material.uniforms.size.value = parameters.size;
+	water.material.uniforms.distortionScale.value = parameters.distortionScale;
+	water.material.uniforms.alpha.value = parameters.alpha;
+
+	renderer.render( scene, camera );
+}
+
+function onDocumentMouseMove(event) {
+	event.preventDefault();
+
+	mouseX = (event.clientX / window.innerWidth) ;
+	mouseY = -(event.clientY / window.innerHeight) ;
+
+}
+
+
+	</script>
+	</body>
+</html>
