@@ -1,0 +1,50 @@
+<html>
+    <head>
+        <title>CMPM163 Review</title>
+        <style>
+            body { margin: 0; }
+        </style>
+    </head>
+
+    <body>
+
+        <!-- Loading external libraries -->
+        <script src="js/three.js"></script>
+        <script src="js/orbit-controls.js"></script>
+        <script src="js/cmgine.js"></script>
+
+        <!-- Loading external shaders -->
+        <script src="shaders/sdf-shader.js"></script>
+
+        <!-- Loading external objects -->
+        <script src="js/objects/plane-sdf.js"></script> 
+      
+
+        <script>
+
+            var width = window.innerWidth;
+            var height = window.innerHeight;
+            
+            // 0. Create a renderer
+            var renderer = new THREE.WebGLRenderer();
+            renderer.setSize(width, height);
+            document.body.appendChild(renderer.domElement);
+
+            // 1. Create a Scene
+            var scene = new THREE.Scene();
+
+            // 1.1 Create a camera
+            var camera = new THREE.OrthographicCamera(width/-2, width/2, height/2, height/-2, 0.1, 1000);
+
+            // 2. Create a cube
+            var plane = createPlaneSDF(width,height);
+
+            // 3. Add cube to the scene
+            scene.add(plane);
+
+            CMENGINE.Start(scene, renderer, camera);
+            CMENGINE.Update();
+
+        </script>
+    </body>
+</html>
