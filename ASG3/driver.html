@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <meta charset="utf-8"/>
+      <title> "Jacquelene"'s Assignment 2 </title>
+      <!-- Include external libraries -->
+      <script src = "lib/webgl-utils.js"></script>
+      <script src = "lib/webgl-debug.js"></script>
+      <script src = "lib/cuon-utils.js"></script>
+      <script src = "lib/cuon-matrix.js"></script>
+      <script src = "lib/load-file.js"></script>
+  
+      <!-- Include main program -->
+      <script src = "prog/main.js"></script>
+
+      <!-- Include tick function -->
+      <script src = "prog/tick.js"></script>
+
+     <!-- Include internal functions -->
+      <script src = "prog/glslFunctions.js"></script>
+      <script src = "prog/eventFunctions.js"></script>
+      <script src = "prog/htmlFunctions.js"></script>
+
+      <!-- Include scene objects -->
+      <script src = "prog/scene/scene.js"></script>
+      <script src = "prog/scene/vertex.js"></script>
+      <script src = "prog/scene/geometry.js"></script>
+
+      <!-- Include geometric objects -->
+      <script src = "prog/geometries/circle.js"></script>
+      <script src = "prog/geometries/square.js"></script>
+      <script src = "prog/geometries/triangle.js"></script>
+      
+      <!-- OBJ Loading -->
+      <script src = "lib/obj_loading/webgl-obj-loader.js"></script>
+      <script src = "lib/obj_loading/loadedOBJ.js"></script>
+
+      <!-- Include animated geometric objects -->
+      <script src = "prog/geometries/animated/randomCircle.js"></script>
+      <script src = "prog/geometries/animated/spinningSquare.js"></script>
+      <script src = "prog/geometries/animated/fluctuatingTriangle.js"></script>
+      <script src = "prog/geometries/animated/tiltedCube.js"></script>
+      <script src = "prog/geometries/animated/rotatingObject.js"></script>
+
+      <!-- Include shaders -->
+      <script src = "prog/shaders.js"></script> 
+
+      
+  </head>
+
+  <body onload = "main()">
+    <p  style="font-family:'Verdana'; font-size: 20px; font-weight: bold"> Assignment 3 </p>
+
+    <!-- MY CODE -->
+    <canvas id="my-canvas" width="500" height="500">
+    Please use a browser that supports "canvas"
+    </canvas>
+
+    <!---****** BUTTONS *******-->
+    <br></br>
+    <!--Text Coordinates-->
+    <p><span id="coord-descrip" style="font-family:'Verdana'"> Click on the canvas to view the GLSL coordinates from the point! </span>  </p>
+    <!--Clear Button-->
+    <button id="clear-btn" style="background-color:#AFC5DA; font-size:12px; border-radius: 10px;  padding: 15px 15px; font-family:'Verdana'; cursor:pointer">Clear Canvas</button>
+    <p></p>
+    <span style="font-family:'Verdana'; font-size:18px">Select OBJ: </span> 
+     <!--Upload OBJ-->
+    <input id="obj-file" type="file"> 
+    <button id="obj-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Add Object</button>
+    <hr>
+    <!--Shape Buttons-->
+    <p style="font-family:'Verdana'; font-size:18px">Drawing Mode: </p>
+    <button id="squares-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Squares</button>
+    <button id="triangles-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Triangles</button>
+    <button id="circles-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Circles</button>
+    <!--Segment Slider (Circle)-->
+    <span style="font-family:'Verdana'">Number of Segments (Circle): </span>
+    <input id="segment-btn" type="range" min="3" max="80" step="1" value="5"/> 
+    <!--Animation Buttons-->
+    <p></p>
+    <button id="squares-spin-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Spinning Squares</button>
+    <button id="triangles-pulse-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Pulsating Triangles</button>
+    <button id="circles-random-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Random Moving Circles</button>
+    <button id="cube-tilt-btn" style="border-radius: 10px;  padding: 5px 5px; font-family:'Verdana';cursor:pointer">Tilted Cube</button>
+    <hr>
+    <!--RGB Buttons-->
+    <p style="font-family:'Verdana'; font-size:18px">Point Color: </p>
+    <span style="font-family:'Verdana'">Red: </span>
+    <input id="red-btn" type="range" min="0" max="1" step=".01" value="1"/> 
+    <span style="font-family:'Verdana'">Green: </span>
+    <input id="green-btn" type="range" min="0" max="1" step=".01" value="0"/> 
+    <span style="font-family:'Verdana'">Blue: </span>
+    <input id="blue-btn" type="range" min="0" max="1" step=".01" value="0"/> 
+    <p style="font-family:'Verdana'; font-size:18px">Point Size:</p>
+    <input id="size-btn" type="range" min="5" max="100" step="1" value="10"/> 
+
+
+
+  </body>
+</html>
